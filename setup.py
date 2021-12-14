@@ -4,7 +4,7 @@ name = "pm-utilities"
 version = "0.0a"
 author = "Patrick McNeely"
 author_email = "pmcneely2@gmail.com"
-license = "Creative Commons CC0"
+license = "MIT"
 text_descr = "README.md"
 
 packages = find_packages(where="src")
