@@ -17,6 +17,7 @@ from typing import NamedTuple
 
 from .log_utilities import (
     create_logger,
+    register_logger,
     ControlledLogger,
 )
 from .string_utilities import string_to_camel_case
@@ -144,7 +145,7 @@ class SQLInterface:
             if log_name in logging.root.manager.loggerDict:
                 self.logger = logging.getLogger(log_name)
             else:
-                logging.setLoggerClass(ControlledLogger)
+                register_logger(ControlledLogger)
                 create_logger(log_name=log_name)
                 self.logger = logging.getLogger(log_name)
                 self.logger.info(

@@ -36,6 +36,8 @@ class ControlledLogger(logging.Logger):
         if self.active:
             super().critical(msg=msg)
 
+def register_logger(klass):
+    logging.setLoggerClass(klass)
 
 def create_logger(log_name, config=None):
 
