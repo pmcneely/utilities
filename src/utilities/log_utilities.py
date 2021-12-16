@@ -1,5 +1,41 @@
 import logging
 
+class ControlledLogger(logging.Logger):
+
+    """
+    Simple logger subclass that allows easy activation/deactivation
+    """
+
+    def __init__(self, name):
+        super().__init__(name)
+        self.active = True
+
+    def activate(self):
+        self.active = True
+
+    def deactivate(self):
+        self.active = False
+
+    def debug(self, msg):
+        if self.active:
+            super().debug(msg=msg)
+
+    def info(self, msg):
+        if self.active:
+            super().info(msg=msg)
+
+    def warning(self, msg):
+        if self.active:
+            super().warning(msg=msg)
+
+    def error(self, msg):
+        if self.active:
+            super().error(msg=msg)
+
+    def critical(self, msg):
+        if self.active:
+            super().critical(msg=msg)
+
 
 def create_logger(log_name, config=None):
 

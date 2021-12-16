@@ -15,7 +15,10 @@ import sqlite3
 
 from typing import NamedTuple
 
-from .log_utilities import create_logger
+from .log_utilities import (
+    create_logger,
+    ControlledLogger,
+)
 from .string_utilities import string_to_camel_case
 
 # TODO: Documentation!
@@ -132,11 +135,16 @@ class SQLInterface:
               {'<table_name>': {'<field_name>', 'type: [<sqlite type> OR <ptr pointer/path>}']}
         """
 
+        assert (
+            config is not None
+        ), "A configuration for the database must be supplied, Aborting"
+
         if log_name is not None:
             # Check if the logger has been created
             if log_name in logging.root.manager.loggerDict:
                 self.logger = logging.getLogger(log_name)
             else:
+                logging.setLoggerClass(ControlledLogger)
                 create_logger(log_name=log_name)
                 self.logger = logging.getLogger(log_name)
                 self.logger.info(
@@ -144,10 +152,8 @@ class SQLInterface:
                     " The preferred use-case is to create the logger"
                     " prior to initializing this interface"
                 )
-            self.log_active = True
         else:
             self.logger = None
-            self.log_active = False
         if self.logger:
             self.logger.debug("Validating configuration")
         validate_config(config)
@@ -164,31 +170,28 @@ class SQLInterface:
         self.meta_info = {"tables": {}}
 
     def activate_logging(self):
-        if self.logger:
-            self.log_active = True
+        if self.logger and isinstance(self.logger, ControlledLogger):
+            self.logger.activate()
             self.logger.info("Activating logging facility")
 
     def deactivate_logging(self):
-        if self.logger:
-            self.logger.info("Deactivating logging facility")
-            self.log_active = False
-
-    def log_running(self):
-        return self.logger is not None and self.log_active
+        if self.logger and isinstance(self.logger, ControlledLogger):
+            self.logger.deactivate()
+            self.logger.info("Deactivated logging facility")
 
     def create_tables(self):
 
-        if self.log_running():
+        if self.logger:
             self.logger.debug(f"Creating tables (from internal configuration)")
         tables = self.config["tables"]
         table_creation_commands = _config_tables_to_commands(tables)
-        if self.log_running():
+        if self.logger:
             self.logger.debug(f"----> Executing table creation commands <----")
             for cmd in table_creation_commands:
                 self.logger.debug(f"\t- {cmd}")
         for cmd in table_creation_commands:
             _execute_command(self.cur, cmd)
-        if self.log_running():
+        if self.logger:
             self.logger.debug(
                 f"Processed tables (type {type(tables)})\n{'*'*80}\n{tables}\n{'*'*80}"
             )
@@ -198,33 +201,33 @@ class SQLInterface:
         table_command = "SELECT name FROM sqlite_master WHERE type='table';"
         tables = _retrieve_data(self.cur, table_command)
         # for table in tables:
-        if self.log_running():
+        if self.logger:
             self.logger.debug([table_name[0] for table_name in tables])
         return [table_name[0] for table_name in tables]
 
     def retrieve_metadata(self):
         tables = self.get_tables()
-        if self.log_running():
+        if self.logger:
             self.logger.debug(f"Retrieved table data: {tables}")
         field_command = 'PRAGMA table_info("{}");'
         for t in tables:
             fields = _retrieve_data(self.cur, field_command.format(t))
-            if self.log_running():
+            if self.logger:
                 self.logger.debug(f"Retrieved field info {fields}")
             if t in self.meta_info["tables"]:
-                if self.log_running():
+                if self.logger:
                     self.logger.debug(
                         f"Found already-defined table {t}. Skipping re-definition"
                     )
                 continue
             self.meta_info["tables"][t] = self.table_to_tuples_for_entry(t, fields)
-        if self.log_running():
+        if self.logger:
             self.logger.debug(
                 f"Retained table meta-information:\n{self.meta_info['tables']}"
             )
 
     def table_to_tuples_for_entry(self, table, fields):
-        if self.log_running():
+        if self.logger:
             self.logger.debug(
                 f"Table conversion: Got table {table} and fields {fields}"
             )
@@ -255,7 +258,7 @@ class SQLInterface:
             field_names = self.meta_info["tables"][table].__annotations__.keys()
             values = []
 
-            if self.log_running():
+            if self.logger:
                 self.logger.debug(f"Found field name information: {field_names}")
                 self.logger.debug("Received data:")
                 for item in data_list:
@@ -267,7 +270,7 @@ class SQLInterface:
                 ",".join(field_names),
                 ",".join(values),
             )
-            if self.log_running():
+            if self.logger:
                 self.logger.debug(f"Issuing insertion command")
                 self.logger.debug(insert_command)
             try:
@@ -293,7 +296,7 @@ class SQLInterface:
                 field_list = [
                     f'"{f}"' for idx, f in enumerate(fields) if item[idx] is not None
                 ]
-                if self.log_running():
+                if self.logger:
                     self.logger.debug(f"Found a deletion field list {field_list}")
                     self.logger.debug(
                         "Running deletion command {}".format(
@@ -321,7 +324,7 @@ class SQLInterface:
          so I leave simplicity/compexity of implementation to the application.
          This package only handles the cursor/connection itself)
         """
-        if self.log_running():
+        if self.logger:
             self.logger.debug(f"Received data query \n\t---> {query}")
         try:
             data = _retrieve_data(self.cur, query)
