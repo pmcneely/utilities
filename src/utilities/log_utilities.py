@@ -16,6 +16,9 @@ class ControlledLogger(logging.Logger):
     def deactivate(self):
         self.active = False
 
+    def is_active(self):
+        return self.active
+
     def debug(self, msg):
         if self.active:
             super().debug(msg=msg)
