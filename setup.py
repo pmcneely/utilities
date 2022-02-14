@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 name = "pm-utilities"
-version = "0.0a"
+version = "0.0.1"
 author = "Patrick McNeely"
 author_email = "pmcneely2@gmail.com"
 license = "MIT"
