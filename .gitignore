@@ -166,3 +166,5 @@ cython_debug/
 
 # Ignore (test) database(s)
 *.db
+test_db
+
