@@ -1,38 +1,8 @@
 %YAML 1.2
 ---
-path: ~/dev/utilities/data
-project: test_config
-tables:
-   apple pie:
-      alice:
-         definition: 
-            - integer
-      bob:
-         definition: 
-            - text
-   bananas foster:
-      claire:
-         definition:
-            - real
-      dave:
-         definition: 
-            - blob
-      erin:
-         definition: 
-            - text
-            - PRIMARY KEY
-   banana details:
-      fred:
-         definition: 
-            - text
-         foreign key: 
-            - bananas foster
-            - erin
-      gina:
-         definition: 
-            - real
-      herb:
-         definition: 
-            - integer
-
-
+# Define the configuration in YAML 1.2
+# as it allows both JSON compaitbility and comments
+# for better readability
+project dir: ~/dev/utilities/ # Path for the project where config and database are stored
+db config: tests/sample_configs/test_db.sql # Path to database definition file (within project path)
+db file: test_db # `.db` file extension is recommended, but not required
