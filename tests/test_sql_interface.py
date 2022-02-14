@@ -29,7 +29,7 @@ class TestSQLInterface(unittest.TestCase):
     dbi = None
 
     def test_1_validate_config(self):
-        print(f"{'*'*20}{'1. Testing config validation':^40}{'*'*20}")
+        print(f"\n{'*'*20}{'1. Testing config validation':^40}{'*'*20}")
         config = self.__class__.sample_config
         self.assertIsNone(validate_config(config))
 
@@ -39,7 +39,7 @@ class TestSQLInterface(unittest.TestCase):
         try:
             db_path = os.path.abspath(
                 os.path.join(
-                    os.path.expanduser(config["path"]) + config["project"] + "_DB.db"
+                    os.path.expanduser(config["project dir"]) + config["db file"]
                 )
             )
             print(f"Removing any previous database file at\n\t{db_path}")
@@ -50,7 +50,7 @@ class TestSQLInterface(unittest.TestCase):
 
     def test_2_connect(self):
 
-        print(f"{'*'*20}{'2. Testing database connection':^40}{'*'*20}")
+        print(f"\n{'*'*20}{'2. Testing database connection':^40}{'*'*20}")
         config = self.__class__.sample_config
 
         self.__class__.dbi = SQLInterface(config, log_name="test")
@@ -58,24 +58,22 @@ class TestSQLInterface(unittest.TestCase):
         # Turn off logging!
         self.__class__.dbi.deactivate_logging()
 
-    def test_3_table_creation(self):
+    def test_3_get_table_entry_information(self):
         self.assertIsNotNone(self.__class__.dbi)
         # XXX: self.__class__.dbi.activate_logging()
-        print(f"{'*'*20}{'3. Testing table creation':^40}{'*'*20}")
+        print(f"\n{'*'*20}{'3. Testing table creation':^40}{'*'*20}")
 
-        self.__class__.dbi.create_tables()
+        self.__class__.dbi.retrieve_metadata()
         # XXX: self.__class__.dbi.deactivate_logging()
 
     def test_4_get_tables(self):
         self.assertIsNotNone(self.__class__.dbi)
-        print(f"{'*'*20}{'4. Testing table retrieval':^40}{'*'*20}")
-
-        tables = self.__class__.dbi.get_tables()
-        print(f"Tables: {tables}")
+        print(f"\n{'*'*20}{'4. Testing table retrieval':^40}{'*'*20}")
+        self.__class__.dbi.get_tables()
 
     def test_5_create_data(self):
         self.assertIsNotNone(self.__class__.dbi)
-        print(f"{'*'*20}{'5. Testing data creation':^40}{'*'*20}")
+        print(f"\n{'*'*20}{'5. Testing data creation':^40}{'*'*20}")
 
         table_entry_objects = self.__class__.dbi.get_data_entry_interfaces()
 
@@ -92,7 +90,7 @@ class TestSQLInterface(unittest.TestCase):
     def test_6_insert_data(self):
 
         self.assertIsNotNone(self.__class__.dbi)
-        print(f"{'*'*20}{'6. Testing data insertion':^40}{'*'*20}")
+        print(f"\n{'*'*20}{'6. Testing data insertion':^40}{'*'*20}")
         # Import appropriate exception from sqlite
         from sqlite3 import IntegrityError
 
@@ -145,9 +143,7 @@ class TestSQLInterface(unittest.TestCase):
 
         # Add _lots_ more data in the 'Foreign key' test table (ie, `banana derivative`)
         BananaDetail = table_entry_objects["banana details"]
-        initial_values = npr.uniform(
-            low=50, high=200, size=(len(letter_ids), 2)
-        )
+        initial_values = npr.uniform(low=50, high=200, size=(len(letter_ids), 2))
         banana_details = {"banana details": []}
         for index, banana_id in enumerate(letter_ids):
             random_walk_values = npr.normal(loc=0, scale=5, size=(50, 2))
@@ -163,7 +159,7 @@ class TestSQLInterface(unittest.TestCase):
 
     def test_7_delete_data(self):
         self.assertIsNotNone(self.__class__.dbi)
-        print(f"{'*'*20}{'7. Testing data deletion':^40}{'*'*20}")
+        print(f"\n{'*'*20}{'7. Testing data deletion':^40}{'*'*20}")
 
         # XXX: Remove the activate/deactivate logging jazz from tests. Document elsewhere
         # XXX: self.__class__.dbi.activate_logging()
@@ -181,18 +177,17 @@ class TestSQLInterface(unittest.TestCase):
         BananaEntry = teo["bananas foster"]
         # TODO: Document field order elsewhere
         banana_fields = BananaEntry._fields
-        print(f"The order of fields in {BananaEntry} is {banana_fields}")
         # Test removal by primary key
         rotten_banana = {"bananas foster": [BananaEntry(None, None, "BCDE")]}
         self.__class__.dbi.delete_rows(rotten_banana)
 
-        # XXX: Remove the activate/deactivate logging jazz from tests. Document elsewhere
+        # TODO: Remove the activate/deactivate logging jazz from tests. Document elsewhere
         # XXX: self.__class__.dbi.deactivate_logging()
 
     def test_8_retrieve_data(self):
 
         self.assertIsNotNone(self.__class__.dbi)
-        print(f"{'*'*20}{'8. Testing data retrieval (1 table)':^40}{'*'*20}")
+        print(f"\n{'*'*20}{'8. Testing data retrieval (1 table)':^40}{'*'*20}")
         # Get the "B"-class dummy data
         to_retrieve = [
             "B" + i + j
