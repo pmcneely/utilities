@@ -154,9 +154,16 @@ class SQLInterface:
                     " prior to initializing this interface"
                 )
         else:
-            self.logger = None
-        if self.logger:
-            self.logger.debug("Validating configuration")
+            self.logger = register_logger(ControlledLogger)
+            log_name = "SQLite Database Interface - Default logger"
+            create_logger(log_name=log_name)
+            self.logger = logging.getLogger(log_name)
+            self.logger.warning(
+                f"Creating a DB interface logger with default settings (name {log_name}). "
+                " Use <DBInterface>.deactivate_logging() to silence."
+                " See documentation for further information"
+            )
+        self.logger.debug("Validating configuration")
         validate_config(config)
         self.config = config
 
@@ -171,12 +178,12 @@ class SQLInterface:
         self.meta_info = {"tables": {}}
 
     def activate_logging(self):
-        if self.logger and isinstance(self.logger, ControlledLogger):
+        if isinstance(self.logger, ControlledLogger):
             self.logger.activate()
             self.logger.info("Activating logging facility")
 
     def deactivate_logging(self):
-        if self.logger and isinstance(self.logger, ControlledLogger):
+        if isinstance(self.logger, ControlledLogger):
             self.logger.deactivate()
             self.logger.info("Deactivated logging facility")
 
@@ -203,29 +210,25 @@ class SQLInterface:
         tables = _retrieve_data(self.cur, table_command)
         # for table in tables:
         if self.logger:
-            self.logger.debug([table_name[0] for table_name in tables])
+        self.logger.debug([table_name[0] for table_name in tables])
         return [table_name[0] for table_name in tables]
 
     def retrieve_metadata(self):
         tables = self.get_tables()
-        if self.logger:
-            self.logger.debug(f"Retrieved table data: {tables}")
+        self.logger.debug(f"Retrieved table data: {tables}")
         field_command = 'PRAGMA table_info("{}");'
         for t in tables:
             fields = _retrieve_data(self.cur, field_command.format(t))
-            if self.logger:
-                self.logger.debug(f"Retrieved field info {fields}")
+            self.logger.debug(f"Retrieved field info {fields}")
             if t in self.meta_info["tables"]:
-                if self.logger:
-                    self.logger.debug(
-                        f"Found already-defined table {t}. Skipping re-definition"
-                    )
+                self.logger.debug(
+                    f"Found already-defined table {t}. Skipping re-definition"
+                )
                 continue
             self.meta_info["tables"][t] = self.table_to_tuples_for_entry(t, fields)
-        if self.logger:
-            self.logger.debug(
-                f"Retained table meta-information:\n{self.meta_info['tables']}"
-            )
+        self.logger.debug(
+            f"Retained table meta-information:\n{self.meta_info['tables']}"
+        )
 
     def table_to_tuples_for_entry(self, table, fields):
         if self.logger:
