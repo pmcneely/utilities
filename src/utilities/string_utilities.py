@@ -6,7 +6,7 @@ def string_to_camel_case(string: str):
 
 
 def string_to_dromedary_case(string: str):
-    """Return dromedaryCase (*not* CasmelCase) of a string separated by spaces or underscores"""
+    """Return dromedaryCase (*not* CamelCase) of a string separated by spaces or underscores"""
     string_list = [s.title() for s in string.replace("_", " ").split()]
     string_list[0] = string_list[0].lower()
     return "".join(string_list)

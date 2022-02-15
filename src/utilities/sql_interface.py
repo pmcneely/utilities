@@ -13,8 +13,6 @@ import logging
 import os
 import sqlite3
 
-from typing import NamedTuple
-
 from .log_utilities import (
     create_logger,
     register_logger,
@@ -44,60 +42,6 @@ def _retrieve_data(cur, command: str):
         raise
 
 
-# XXX
-# TODO - Remove this jazz
-# def _config_tables_to_commands(tables: dict):
-
-#     # Return values
-#     commands = []
-
-#     for table, fields in tables.items():
-#         primary_key_defined = False
-#         for field_name, properties in fields.items():
-#             if primary_key_defined:
-#                 break
-#             for field_definition in properties["definition"]:
-#                 if "PRIMARY KEY" in field_definition:
-#                     primary_key_defined = True
-#                     break
-
-#         cmd = f'CREATE TABLE IF NOT EXISTS "{table}"'
-#         cmd += " (id integer PRIMARY KEY, " if not primary_key_defined else " ("
-
-#         cmd_suffix = ""
-
-#         for field_name in fields.keys():
-#             field_properties = fields[field_name]
-#             field_definition = field_properties["definition"]
-#             field_t = field_definition[0].upper()
-#             if field_t in SQLInterface.sqlite_types:
-#                 cmd += f'"{field_name}" {field_t}'
-#                 if len(field_definition) > 1:
-#                     cmd += " " + " ".join(field_definition[1:])
-#             else:
-#                 raise TypeError(
-#                     f'Data type {field_t} (in field "{field_name}") not recognized as SQL type.'
-#                     f"Available types are {SQLInterface.sqlite_types.keys()}"
-#                 )
-#             if "foreign key" in field_properties:
-#                 fk_details = field_properties["foreign key"]
-#                 cmd_suffix += ', FOREIGN KEY ("{}") REFERENCES "{}" ("{}")'.format(
-#                     field_name, fk_details[0], fk_details[1]
-#                 )
-#             cmd += ", "
-
-#         cmd = cmd.rstrip(", ")
-#         if cmd_suffix:
-#             cmd += cmd_suffix
-#         if primary_key_defined:
-#             cmd += ") WITHOUT ROWID;"
-#         else:
-#             cmd += ");"
-#         commands.append(cmd)
-
-#     return commands
-
-
 def validate_config(config: dict):
     try:
         assert {"project dir", "db config", "db file"}.issubset(
@@ -117,11 +61,12 @@ class SQLInterface:
     def __init__(self, config: dict = None, log_name: str = None):
         """
         'config' should include the following information:
-            'path': Base directory for where data should be stored
+            'project dir': Base directory for where data should be stored
                 For SQLite databases, this will be the root folder
                 which contains the database and the 'DB' folder
                 that contains linked information.
-            'db file': Pre-created database file (SQLite-only!) at `path`
+            'db config': SQL script defining the database
+            'db file': Database file (SQLite-only!) at `path`, optionally already created
         """
 
         assert (
@@ -170,7 +115,7 @@ class SQLInterface:
         if not db_exists:
             try:
                 config_path = os.path.join(base_path, config["db config"])
-                with open(config_path, 'r') as db_config:
+                with open(config_path, "r") as db_config:
                     sql_string = db_config.read()
                     self.cur.executescript(sql_string)
                 db_config.close()
@@ -187,26 +132,6 @@ class SQLInterface:
         if isinstance(self.logger, ControlledLogger):
             self.logger.deactivate()
             self.logger.info("Deactivated logging facility")
-
-    # XXX Let SQLite handle creation/removal of tables.
-    # TODO: Change DB configuration file (`.yaml`) to SQL definition (`.sql`)
-    # def create_database(self):
-
-    #     if self.logger:
-    #         self.logger.debug(f"Creating tables (from internal configuration)")
-    #     tables = self.config["tables"]
-    #     table_creation_commands = _config_tables_to_commands(tables)
-    #     if self.logger:
-    #         self.logger.debug(f"----> Executing table creation commands <----")
-    #         for cmd in table_creation_commands:
-    #             self.logger.debug(f"\t- {cmd}")
-    #     for cmd in table_creation_commands:
-    #         _execute_command(self.cur, cmd)
-    #     if self.logger:
-    #         self.logger.debug(
-    #             f"Processed tables (type {type(tables)})\n{'*'*80}\n{tables}\n{'*'*80}"
-    #         )
-    #     self.retrieve_metadata()
 
     def get_tables(self):
         table_command = "SELECT name FROM sqlite_master WHERE type='table';"
@@ -226,12 +151,12 @@ class SQLInterface:
                     f"Found already-defined table {t}. Skipping re-definition"
                 )
                 continue
-            self.meta_info["tables"][t] = self.table_to_tuples_for_entry(t, fields)
+            self.meta_info["tables"][t] = self.get_table_information(t, fields)
         self.logger.debug(
             f"Retained table meta-information:\n{self.meta_info['tables']}"
         )
 
-    def table_to_tuples_for_entry(self, table, fields):
+    def get_table_information(self, table, fields):
         self.logger.debug(f"Table conversion: Got table {table} and fields {fields}")
         self.logger.debug(f"---> Table conversion is {string_to_camel_case(table)}")
         self.logger.debug(
