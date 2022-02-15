@@ -232,23 +232,19 @@ class SQLInterface:
         )
 
     def table_to_tuples_for_entry(self, table, fields):
-        self.logger.debug(
-            f"Table conversion: Got table {table} and fields {fields}"
-        )
+        self.logger.debug(f"Table conversion: Got table {table} and fields {fields}")
         self.logger.debug(f"---> Table conversion is {string_to_camel_case(table)}")
         self.logger.debug(
             f"Field conversion is {[(field[1], field[2].upper()) for field in fields if field[1] != 'id']}"
         )
-        # NB: This ignores the 'id' field on the assumption that it is an AUTOINCREMENTing field handled by the database
-        return NamedTuple(
-            string_to_camel_case(table),
-            [
-                # *Pylance isn't perfect, and gets confused with this comprehension. Hence, `type: ignore`*
-                (field[1], field[2].upper())  # type: ignore
-                for field in fields
-                if field[1] != "id"
-            ],
-        )
+        keys = set()
+        field_names = {}
+        for f in fields:
+            field_names[f[1]] = (f[0] + 1, f[2].upper())  # Tuple(Field index, Field type)
+            if f[-1] > 0:
+                # It's a key!
+                keys.add(f[1])
+        return {"name": table, "fields": field_names, "keys": keys}
 
     def get_data_entry_interfaces(self):
         return copy.deepcopy(self.meta_info["tables"])
