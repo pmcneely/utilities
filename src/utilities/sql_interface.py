@@ -12,6 +12,9 @@ import copy
 import logging
 import os
 import sqlite3
+import string
+
+from typing import NamedTuple
 
 from .log_utilities import (
     create_logger,
@@ -143,44 +146,120 @@ class SQLInterface:
         tables = self.get_tables()
         self.logger.debug(f"Retrieved table data: {tables}")
         field_command = 'PRAGMA table_info("{}");'
-        for t in tables:
-            fields = _retrieve_data(self.cur, field_command.format(t))
+        for table in tables:
+            fields = _retrieve_data(self.cur, field_command.format(table))
             self.logger.debug(f"Retrieved field info {fields}")
-            if t in self.meta_info["tables"]:
+            if table in self.meta_info["tables"]:
                 self.logger.debug(
-                    f"Found already-defined table {t}. Skipping re-definition"
+                    f"Found already-defined table {table}. Skipping re-definition"
                 )
                 continue
-            self.meta_info["tables"][t] = self.get_table_information(t, fields)
+            self.meta_info["tables"][table] = self.get_table_information(table, fields)
         self.logger.debug(
             f"Retained table meta-information:\n{self.meta_info['tables']}"
         )
 
     def get_table_information(self, table, fields):
         self.logger.debug(f"Table conversion: Got table {table} and fields {fields}")
-        self.logger.debug(f"---> Table conversion is {string_to_camel_case(table)}")
-        self.logger.debug(
-            f"Field conversion is {[(field[1], field[2].upper()) for field in fields if field[1] != 'id']}"
-        )
-        keys = set()
+        keys, required = [], []
         field_names = {}
         for f in fields:
-            field_names[f[1]] = (f[0] + 1, f[2].upper())  # Tuple(Field index, Field type)
-            if f[-1] > 0:
-                # It's a key!
-                keys.add(f[1])
-        return {"name": table, "fields": field_names, "keys": keys}
+            field_names[f[1]] = (
+                f[0] + 1,
+                f[2].upper(),
+            )  # Tuple(Field index, Field type)
+            if f[5] > 0:
+                # It's a key! The keys list preserves key index order
+                keys.append(f[1])
+            if f[3] > 0:
+                required.append(f[1])
+        return {"fields": field_names, "keys": keys, "required": required}
 
-    def get_data_entry_interfaces(self):
-        return copy.deepcopy(self.meta_info["tables"])
+    def get_table_fields(self, table):
+        assert (
+            table in self.meta_info["tables"]
+        ), f"Did not find requested table {table}. Aborting"
+        return list(self.meta_info["tables"][table]["fields"].keys())
 
-    def insert_rows(self, data: dict):
+    def get_data_entry_interfaces(self, table: str, fields: list = None):
+        """
+        Returns an interface containing either of:
+          'fields' arg is `None`
+          - Field names and associated tuple generator for keys and required (NOT NULL) fields
+          'fields' arg is a list of fields for update
+          - Field names and associated tuple generator for requested fields
+        """
+        table_info = self.meta_info["tables"][table]
+        db_fields = table_info["fields"]
+        db_keys = table_info["keys"]
+        db_required_fields = table_info["required"]
+        required_fields = []
+        if fields is None:
+            required_fields = db_keys + db_required_fields
+            self.logger.debug(f"Default required fields: {required_fields}")
+        else:
+            assert isinstance(
+                fields, list
+            ), "Fields argument must be a list or None [default: return required fields only]"
+            assert set(fields).issubset(db_fields.keys()), (
+                "Fields passed are not a subset of table fields\n"
+                f"--- Requested: {fields}\n"
+                f"--- Fields available: {db_fields.keys()}"
+            )
+            self.logger.debug(f"Selected fields: {required_fields}")
+            required_fields = fields
+        assert fields != [], "Field collection error. Aborting"
+        self.logger.debug(f"Found required fields: {required_fields}")
+        field_string = ", ".join(required_fields)
+        tuple_fields = [
+            (string_to_camel_case(name), col_info[1].upper())
+            for name, col_info in db_fields.items()
+            if name in set(required_fields)
+        ]
+        # Re-roll field and type information
+        # NB: Fields in named tuples are NOT exact matches to database names
+        entry_tuple = NamedTuple(
+            string_to_camel_case(table),
+            # *Pylance isn't perfect, and gets confused with this comprehension. Hence, `type: ignore`*
+            [(field[0], field[1]) for field in tuple_fields],  # type: ignore
+        )
+        return (field_string, entry_tuple)
+
+    def insert_rows(self, table: str, entry_obj: tuple, data: list):
+        assert table in self.meta_info["tables"], (
+            f"Database interface doesn't have table {table}, aborting"
+            f"\nAvailable tables are {self.meta_info['tables'].keys()}"
+        )
+        values = []
+
+        self.logger.debug(f"Found field name information: {field_names}")
+        self.logger.debug("Received data:")
+        for item in data_list:
+            self.logger.debug(f"\t- {item}")
+        for item in data_list:
+            values.append(str(tuple(item)))
+        insert_command = 'INSERT INTO "{}" ({}) VALUES {};'.format(
+            table,
+            ",".join(field_names),
+            ",".join(values),
+        )
+        self.logger.debug(f"Issuing insertion command")
+        self.logger.debug(insert_command)
+        try:
+            _execute_command(self.cur, insert_command)
+        except Exception as e:
+            raise e
+        self.conn.commit()
+
+    def update_rows(self, data: dict):
         for table, data_list in data.items():
             assert table in self.meta_info["tables"], (
                 f"Database interface doesn't have table {table}, aborting"
                 f"\nAvailable rows are {self.meta_info['tables'].keys()}"
             )
-            field_names = self.meta_info["tables"][table].__annotations__.keys()
+            field_names = [
+                f'"{name}"' for name in self.meta_info["tables"][table]["fields"].keys()
+            ]
             values = []
 
             self.logger.debug(f"Found field name information: {field_names}")
@@ -189,7 +268,7 @@ class SQLInterface:
                 self.logger.debug(f"\t- {item}")
             for item in data_list:
                 values.append(str(tuple(item)))
-            insert_command = 'INSERT INTO "{}" ({}) VALUES {};'.format(
+            insert_command = 'UPDATE "{}" SET ({}) WHERE {};'.format(
                 table,
                 ",".join(field_names),
                 ",".join(values),
