@@ -175,103 +175,48 @@ class SQLInterface:
                 required.append(f[1])
         return {"fields": field_names, "keys": keys, "required": required}
 
-    def get_table_fields(self, table):
+    def get_all_table_fields(self, table):
         assert (
             table in self.meta_info["tables"]
         ), f"Did not find requested table {table}. Aborting"
         return list(self.meta_info["tables"][table]["fields"].keys())
 
-    def get_data_entry_interfaces(self, table: str, fields: list = None):
-        """
-        Returns an interface containing either of:
-          'fields' arg is `None`
-          - Field names and associated tuple generator for keys and required (NOT NULL) fields
-          'fields' arg is a list of fields for update
-          - Field names and associated tuple generator for requested fields
-        """
+    def get_data_entry_fields(self, table: str, fields: list = None):
+
+        # Returns (keys, [required_fields|fields_for_update])
+
         table_info = self.meta_info["tables"][table]
         db_fields = table_info["fields"]
         db_keys = table_info["keys"]
         db_required_fields = table_info["required"]
-        required_fields = []
         if fields is None:
-            required_fields = db_keys + db_required_fields
-            self.logger.debug(f"Default required fields: {required_fields}")
+            return (db_keys, db_required_fields)
         else:
             assert isinstance(
                 fields, list
-            ), "Fields argument must be a list or None [default: return required fields only]"
+            ), "Fields argument must be a list or None [default: return keys and required fields only]"
             assert set(fields).issubset(db_fields.keys()), (
                 "Fields passed are not a subset of table fields\n"
                 f"--- Requested: {fields}\n"
                 f"--- Fields available: {db_fields.keys()}"
             )
-            self.logger.debug(f"Selected fields: {required_fields}")
-            required_fields = fields
-        assert fields != [], "Field collection error. Aborting"
-        self.logger.debug(f"Found required fields: {required_fields}")
-        field_string = ", ".join(required_fields)
-        tuple_fields = [
-            (string_to_camel_case(name), col_info[1].upper())
-            for name, col_info in db_fields.items()
-            if name in set(required_fields)
-        ]
-        # Re-roll field and type information
-        # NB: Fields in named tuples are NOT exact matches to database names
-        entry_tuple = NamedTuple(
-            string_to_camel_case(table),
-            # *Pylance isn't perfect, and gets confused with this comprehension. Hence, `type: ignore`*
-            [(field[0], field[1]) for field in tuple_fields],  # type: ignore
-        )
-        return (field_string, entry_tuple)
+            return (db_keys, fields)
 
-    def insert_rows(self, table: str, entry_obj: tuple, data: list):
-        assert table in self.meta_info["tables"], (
-            f"Database interface doesn't have table {table}, aborting"
-            f"\nAvailable tables are {self.meta_info['tables'].keys()}"
-        )
-        values = []
+    def insert_rows(self, table: str, fields: list, data: list):
 
-        self.logger.debug(f"Found field name information: {field_names}")
+        assert isinstance(
+            data, list
+        ), "Data must be provided as a list (even singleton entries!)"
+
+        self.logger.debug(f"Found fields for insertion: {fields}")
         self.logger.debug("Received data:")
-        for item in data_list:
+        fields = [f'"{field}"' for field in fields]
+        for item in data:
             self.logger.debug(f"\t- {item}")
-        for item in data_list:
-            values.append(str(tuple(item)))
-        insert_command = 'INSERT INTO "{}" ({}) VALUES {};'.format(
-            table,
-            ",".join(field_names),
-            ",".join(values),
-        )
-        self.logger.debug(f"Issuing insertion command")
-        self.logger.debug(insert_command)
-        try:
-            _execute_command(self.cur, insert_command)
-        except Exception as e:
-            raise e
-        self.conn.commit()
-
-    def update_rows(self, data: dict):
-        for table, data_list in data.items():
-            assert table in self.meta_info["tables"], (
-                f"Database interface doesn't have table {table}, aborting"
-                f"\nAvailable rows are {self.meta_info['tables'].keys()}"
-            )
-            field_names = [
-                f'"{name}"' for name in self.meta_info["tables"][table]["fields"].keys()
-            ]
-            values = []
-
-            self.logger.debug(f"Found field name information: {field_names}")
-            self.logger.debug("Received data:")
-            for item in data_list:
-                self.logger.debug(f"\t- {item}")
-            for item in data_list:
-                values.append(str(tuple(item)))
-            insert_command = 'UPDATE "{}" SET ({}) WHERE {};'.format(
+            insert_command = 'INSERT INTO "{}" ({}) VALUES ({});'.format(
                 table,
-                ",".join(field_names),
-                ",".join(values),
+                ", ".join(fields),
+                ", ".join(f'"{i}"' for i in item),
             )
             self.logger.debug(f"Issuing insertion command")
             self.logger.debug(insert_command)
@@ -279,44 +224,56 @@ class SQLInterface:
                 _execute_command(self.cur, insert_command)
             except Exception as e:
                 raise e
-            self.conn.commit()
+        self.conn.commit()
 
-    def delete_rows(self, data: dict):
-        """
-        data: 'table': [data_obj1, data_obj2, ...]
-        Deletes data (from NamedTuple objects for each table)
-            where fields match those found in data_obj
-            e.g. obj: Apple has fields 'alice', 'bob'
-            deletion for all rows where bob == XYZ requires format
-            {'table name': [Apple(None, 'XYZ')]}
-            None-field indicates non-inclusion in deletion criterion
-        """
-        for table, list_to_delete in data.items():
-            deletion_cmd = 'DELETE FROM "{}" WHERE ({}) == {};'
-            for item in list_to_delete:
-                fields = item._fields
-                field_list = [
-                    f'"{f}"' for idx, f in enumerate(fields) if item[idx] is not None
-                ]
-                self.logger.debug(f"Found a deletion field list {field_list}")
-                self.logger.debug(
-                    "Running deletion command {}".format(
-                        deletion_cmd.format(
-                            table,
-                            ",".join(field_list),
-                            ",".join([f'"{i}"' for i in item if i is not None]),
-                        ),
-                    )
-                )
-                _execute_command(
-                    self.cur,
-                    deletion_cmd.format(
-                        table,
-                        ",".join(field_list),
-                        ",".join([f'"{i}"' for i in item if i is not None]),
-                    ),
-                )
-                self.conn.commit()
+    def update_rows(self, table: str, update_info: dict):
+
+        insert_command = f'UPDATE "{table}" '
+        key_fields = update_info["keys"]
+        update_fields = update_info["update fields"]
+        new_values = update_info["update values"]
+        for nv in new_values:
+            assert len(key_fields) == len(
+                nv[0]
+            ), "Mismatch in key search parameters, aborting"
+            assert len(update_fields) == len(
+                nv[1]
+            ), "Mismatch in update field parameters, aborting"
+            set_values = " AND ".join(
+                ['"{}" = "{}"'.format(a, b) for a, b in zip(update_fields, nv[1])]
+            ).rstrip(" AND ")
+            where_values = " AND ".join(
+                ['"{}" = "{}"'.format(a, b) for a, b in zip(key_fields, nv[0])]
+            ).rstrip(" AND ")
+            cmd = insert_command + "SET {} WHERE {};".format(
+                set_values,
+                where_values,
+            )
+            self.logger.debug(f"Issuing insertion command\n\t ---> {cmd}")
+            try:
+                _execute_command(self.cur, cmd)
+            except Exception as e:
+                raise e
+        self.conn.commit()
+
+    def delete_rows(self, table: str, fields: list, data: list):
+        deletion_cmd = f'DELETE FROM "{table}" WHERE '  #  ({}) == {};'
+        self.logger.debug(f"Found a deletion field list {fields}")
+        for item in data:
+            assert len(item) == len(
+                fields
+            ), f"Mismatch in deletion fields {fields} with query {item}. Aborting."
+            cmd = deletion_cmd
+            for idx, i in enumerate(item):
+                cmd += '("{}") == "{}" AND '.format(fields[idx], i)
+            cmd = cmd.rstrip(" AND ")
+            cmd += ";"
+            self.logger.debug("Running deletion command {}".format(cmd))
+            try:
+                _execute_command(self.cur, cmd)
+            except Exception as e:
+                raise
+            self.conn.commit()
 
     def retrieve_rows(self, query: str):
         """
