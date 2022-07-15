@@ -97,7 +97,7 @@ class TestSQLInterface(unittest.TestCase):
         self.assertEqual(apple_requirements, ["bonnie"])
         self.assertEqual(banana_requirements, ["erin", "claire"])
 
-        self.__class__.dbi.insert_rows("apple pie", apple_requirements, [(0,)])
+        self.__class__.dbi.insert_rows("apple pie", apple_requirements, [(0,), (1,)])
         self.__class__.dbi.insert_rows("bananas foster", banana_requirements, [(0, 0)])
 
         # XXX: self.__class__.dbi.deactivate_logging()
@@ -118,7 +118,7 @@ class TestSQLInterface(unittest.TestCase):
             ("new data", "different key!", "BCDE"),
         ]
 
-        # XXX: self.__class__.dbi.activate_logging()
+        # XXX: self.__class__.dbi.activate_logging() 
         # TODO: Move small exemplar(s) to documentation, leave large data test in place
         # Add a little data
 
@@ -129,13 +129,15 @@ class TestSQLInterface(unittest.TestCase):
         #      can have duplicate entries
         #      Data in tables defined `WITHOUT ROWID` should report conflict with previous keys
         self.__class__.dbi.insert_rows("apple pie", apple_fields, new_apple_data)
-        self.assertRaises(
-            IntegrityError,
-            self.__class__.dbi.insert_rows,
-            "bananas foster",
-            banana_fields,
-            new_banana_data,
-        )
+        # TODO: Insert command only includes REPLACE on conflict.
+        #   There should be better control over behavior on conflict.
+        # self.assertRaises(
+        #     IntegrityError,
+        #     self.__class__.dbi.insert_rows,
+        #     "bananas foster",
+        #     banana_fields,
+        #     new_banana_data,
+        # )
         # XXX: self.__class__.dbi.deactivate_logging()
 
         # Add lots of data
@@ -173,7 +175,7 @@ class TestSQLInterface(unittest.TestCase):
         print(f"\n{'*'*20}{'7. Testing data deletion':^40}{'*'*20}")
 
         # XXX: Remove the activate/deactivate logging jazz from tests. Document elsewhere
-        self.__class__.dbi.activate_logging()  # XXX:
+        # XXX: self.__class__.dbi.activate_logging()
         apple_fields = self.__class__.dbi.get_all_table_fields("apple pie")
         # List the fields to determine order as needed
         # TODO: Document field order elsewhere
@@ -194,7 +196,7 @@ class TestSQLInterface(unittest.TestCase):
         self.__class__.dbi.delete_rows("bananas foster", removal_fields, rotten_banana)
 
         # TODO: Remove the activate/deactivate logging jazz from tests. Document elsewhere
-        self.__class__.dbi.deactivate_logging()  # XXX:
+        # XXX: self.__class__.dbi.deactivate_logging()
 
     def test_8_retrieve_data(self):
 
@@ -231,14 +233,18 @@ class TestSQLInterface(unittest.TestCase):
         all_bananas_fields = self.__class__.dbi.get_all_table_fields("bananas foster")
         new_banana = [tuple(results)]
 
-        # Can't use insert!
-        self.assertRaises(
-            IntegrityError,
-            self.__class__.dbi.insert_rows,
-            "bananas foster",
-            all_bananas_fields,
-            new_banana,
-        )
+        # TODO // TBD: Can, in fact, use insert...
+        #  --> SQL supports multiple control flows via `ON CONFLICT` (table creation)
+        #      and `INSERT OR [REPLACE|ABORT|FAIL|etc.]` commands.
+        # Whether to implement additional control flows or not is TBD
+        # ___Can't use insert!___
+        # self.assertRaises(
+        #     IntegrityError,
+        #     self.__class__.dbi.insert_rows,
+        #     "bananas foster",
+        #     all_bananas_fields,
+        #     new_banana,
+        # )
 
         # ...need to use an update method
         # Get the keys and fields for update

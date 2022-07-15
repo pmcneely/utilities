@@ -14,6 +14,8 @@ import os
 import sqlite3
 import string
 
+import pandas as pd
+
 from typing import NamedTuple
 
 from .log_utilities import (
@@ -79,7 +81,7 @@ class SQLInterface:
         if log_name is not None:
             # Check if the logger has been created
             if log_name in logging.root.manager.loggerDict:
-                self.logger = logging.getLogger(log_name)
+                self.logger = logging.getLogger(log_name).getChild("DBI")
             else:
                 register_logger(ControlledLogger)
                 create_logger(log_name=log_name)
@@ -125,6 +127,7 @@ class SQLInterface:
             except:
                 raise
         self.meta_info = {"tables": {}}
+        self.retrieve_metadata()
 
     def activate_logging(self):
         if isinstance(self.logger, ControlledLogger):
@@ -209,21 +212,22 @@ class SQLInterface:
         ), "Data must be provided as a list (even singleton entries!)"
 
         self.logger.debug(f"Found fields for insertion: {fields}")
-        self.logger.debug("Received data:")
+        self.logger.debug(f"Received data:\n{data}")
         fields = [f'"{field}"' for field in fields]
-        for item in data:
-            self.logger.debug(f"\t- {item}")
-            insert_command = 'INSERT INTO "{}" ({}) VALUES ({});'.format(
-                table,
-                ", ".join(fields),
-                ", ".join(f'"{i}"' for i in item),
-            )
-            self.logger.debug(f"Issuing insertion command")
-            self.logger.debug(insert_command)
-            try:
-                _execute_command(self.cur, insert_command)
-            except Exception as e:
-                raise e
+        insert_command = 'INSERT OR REPLACE INTO "{}" ({})'.format(
+            table,
+            ", ".join(fields),
+        )
+        insert_command += " VALUES {};".format(
+            ",".join(f"{tup}" if len(tup) > 1 else f"({tup[0]})" for tup in data)
+        )
+        self.logger.debug(f"Issuing insertion command")
+        self.logger.debug(insert_command)
+        try:
+            _execute_command(self.cur, insert_command)
+        except Exception as e:
+            print(f" --- Exception {e} ---\nLast command:\n\t{insert_command}")
+            raise
         self.conn.commit()
 
     def update_rows(self, table: str, update_info: dict):
@@ -284,10 +288,17 @@ class SQLInterface:
         """
         self.logger.debug(f"Received data query \n\t---> {query}")
         try:
-            data = _retrieve_data(self.cur, query)
-            return data
+            return _retrieve_data(self.cur, query)
         except Exception as e:
             raise
 
     def remove_tables(self):
         raise NotImplementedError("TBD!")
+
+    def execute_pandas_query(self, command: str):
+        # Execute a pandas-formatted query with table name known (fields optional)
+        # ...What could go wrong?
+        try:
+            return pd.read_sql_query(command, self.conn)
+        except Exception as e:
+            raise
