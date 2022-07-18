@@ -1,46 +1,37 @@
 import logging
 
-class ControlledLogger(logging.Logger):
+
+class DummyLogger(logging.Logger):
 
     """
-    Simple logger subclass that allows easy activation/deactivation
+    Simple logger subclass that does nothing
+    (ie, is completely silent whenever invoked)
     """
 
     def __init__(self, name):
         super().__init__(name)
-        self.active = True
-
-    def activate(self):
-        self.active = True
-
-    def deactivate(self):
-        self.active = False
-
-    def is_active(self):
-        return self.active
 
     def debug(self, msg):
-        if self.active:
-            super().debug(msg=msg)
+        ...
 
     def info(self, msg):
-        if self.active:
-            super().info(msg=msg)
+        ...
 
     def warning(self, msg):
-        if self.active:
-            super().warning(msg=msg)
+        ...
 
     def error(self, msg):
-        if self.active:
-            super().error(msg=msg)
+        ...
 
     def critical(self, msg):
-        if self.active:
-            super().critical(msg=msg)
+        ...
 
-def register_logger(klass):
+
+def register_dummy_logger(klass):
     logging.setLoggerClass(klass)
+
+def register_regular_logger():
+    logging.setLoggerClass(logging.Logger)
 
 def create_logger(log_name, config=None):
 
@@ -75,7 +66,7 @@ def get_formatter(fmt):
 
     """
     Accepts either an integer selection for format selection, or a custom string.
-    Toggle between the options is based on success/failure in casting the 
+    Toggle between the options is based on success/failure in casting the
     argument to an integer.
     """
 
@@ -85,7 +76,9 @@ def get_formatter(fmt):
         if fmt == 1:
             format_string = "%(name)s:%(levelname)-8s - %(filename)s:%(funcName)s:%(lineno)d:%(message)s"
         if fmt == 2:
-            format_string = "%(levelname)-8s - %(filename)s:%(funcName)s:%(lineno)d:%(message)s"
+            format_string = (
+                "%(levelname)-8s - %(filename)s:%(funcName)s:%(lineno)d:%(message)s"
+            )
     except:
         format_string = fmt
     formatter = logging.Formatter(format_string)
