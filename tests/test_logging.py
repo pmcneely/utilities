@@ -2,6 +2,8 @@ import logging
 
 import utilities as utils
 
+from typing import List
+
 # Confirm standard logging
 
 std_logger_name = "TestLogger"
@@ -21,7 +23,7 @@ restored_logger = logging.getLogger(restored_logger_name)
 
 standard_logger.info(f"Hello, I'm a normal logger")
 silent_logger.info(f"You shouldn't hear this")
-restored_logger.info(f"Working again! (From a new logger")
+restored_logger.info(f"Working again! (From a new logger)")
 
 standard_logger.debug("The original logger is now debugging")
 silent_logger.debug("In space, no one can hear you scream")
@@ -29,7 +31,7 @@ restored_logger.debug("Restored logger, now debugging!")
 
 logger_list = [standard_logger, silent_logger, restored_logger]
 
-def func_to_test_info_level(msg: str, loggers: list[logging.Logger]) -> None:
+def func_to_test_info_level(msg: str, loggers: List[logging.Logger]) -> None:
     if type(loggers) is logging.Logger:
         loggers = [loggers]
     else:
