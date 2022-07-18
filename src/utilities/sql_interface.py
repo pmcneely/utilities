@@ -18,15 +18,15 @@ import pandas as pd
 
 from typing import NamedTuple
 
-from .log_utilities import (
-    create_logger,
-    register_logger,
-    ControlledLogger,
-)
 from .string_utilities import string_to_camel_case
 
 # TODO: Documentation!
 
+from .log_utilities import (
+    register_dummy_logger,
+    create_logger,
+    DummyLogger,
+)
 
 def _execute_command(cur, command: str):
 
@@ -80,27 +80,17 @@ class SQLInterface:
 
         if log_name is not None:
             # Check if the logger has been created
-            if log_name in logging.root.manager.loggerDict:
-                self.logger = logging.getLogger(log_name).getChild("DBI")
-            else:
-                register_logger(ControlledLogger)
-                create_logger(log_name=log_name)
+            try:
+                assert(log_name in logging.root.manager.loggerDict), \
+                    f"Log name {log_name} not yet created, aborting" 
                 self.logger = logging.getLogger(log_name)
-                self.logger.info(
-                    "Creating a logger with default configuration."
-                    " The preferred use-case is to create the logger"
-                    " prior to initializing this interface"
-                )
+            except Exception as e:
+                raise
         else:
-            self.logger = register_logger(ControlledLogger)
-            log_name = "SQLite Database Interface - Default logger"
-            create_logger(log_name=log_name)
-            self.logger = logging.getLogger(log_name)
-            self.logger.warning(
-                f"Creating a DB interface logger with default settings (name {log_name}). "
-                " Use <DBInterface>.deactivate_logging() to silence."
-                " See documentation for further information"
-            )
+            register_dummy_logger(DummyLogger)
+            create_logger("SQLInterfaceSilentLogger")
+            self.logger = logging.getLogger("SQLInterfaceSilentLogger")
+            print("--- SQL Interface: Creating default *SILENT* logger ---")
         self.logger.debug("Validating configuration")
         validate_config(config)
         self.config = config
@@ -128,16 +118,6 @@ class SQLInterface:
                 raise
         self.meta_info = {"tables": {}}
         self.retrieve_metadata()
-
-    def activate_logging(self):
-        if isinstance(self.logger, ControlledLogger):
-            self.logger.activate()
-            self.logger.info("Activating logging facility")
-
-    def deactivate_logging(self):
-        if isinstance(self.logger, ControlledLogger):
-            self.logger.deactivate()
-            self.logger.info("Deactivated logging facility")
 
     def get_tables(self):
         table_command = "SELECT name FROM sqlite_master WHERE type='table';"
