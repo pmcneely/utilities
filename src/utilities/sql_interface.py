@@ -23,9 +23,8 @@ from .string_utilities import string_to_camel_case
 # TODO: Documentation!
 
 from .log_utilities import (
-    register_dummy_logger,
+    create_silent_logger,
     create_logger,
-    DummyLogger,
 )
 
 def _execute_command(cur, command: str):
@@ -87,8 +86,7 @@ class SQLInterface:
             except Exception as e:
                 raise
         else:
-            register_dummy_logger(DummyLogger)
-            create_logger("SQLInterfaceSilentLogger")
+            create_silent_logger("SQLInterfaceSilentLogger")
             self.logger = logging.getLogger("SQLInterfaceSilentLogger")
             print("--- SQL Interface: Creating default *SILENT* logger ---")
         self.logger.debug("Validating configuration")

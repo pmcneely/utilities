@@ -27,13 +27,22 @@ class DummyLogger(logging.Logger):
         ...
 
 
-def register_dummy_logger(klass):
+def _register_dummy_logger(klass):
     logging.setLoggerClass(klass)
 
-def register_regular_logger():
+def _register_regular_logger():
     logging.setLoggerClass(logging.Logger)
 
+def create_silent_logger(log_name, config=None):
+    _register_dummy_logger(DummyLogger)
+    _create_logger(log_name)
+    _register_regular_logger()
+
 def create_logger(log_name, config=None):
+    _register_regular_logger()
+    _create_logger("Verbose")
+
+def _create_logger(log_name, config=None):
 
     if config is None:
 
