@@ -43,7 +43,24 @@ def create_silent_logger(log_name, config=None):
 
 def create_logger(log_name, config=None):
     _register_regular_logger()
-    _create_logger("Verbose")
+    _create_logger(log_name)
+
+
+def create_sample_logger_suite():
+    # Create three standard loggers, with hard-coded names.
+    # This is strictly for my own personal convenience :)
+    # Thus, no arguments, argument checks, etc.
+    # "Any color you like..."
+
+    create_logger("DebugLogger")
+    debug_logger = logging.getLogger("DebugLogger")
+    create_silent_logger("SilentLogger")
+    quiet_logger = logging.getLogger("SilentLogger")
+    create_logger("InfoLogger")
+    info_logger = logging.getLogger("InfoLogger")
+    info_logger.setLevel(logging.INFO)
+
+    return debug_logger, quiet_logger, info_logger
 
 
 def confirm_logger(logger: logging.Logger):
